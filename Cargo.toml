@@ -1,0 +1,52 @@
+[package]
+name = "mdview"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+comrak = { version = "0.50.0", default-features = false, features = ["syntect"] }
+notify = "8"
+notify-debouncer-mini = "0.6"
+objc2 = "0.6.3"
+block2 = "0.6.2"
+objc2-foundation = { version = "0.3.2", default-features = false, features = [
+    "std",
+    "NSArray",
+    "objc2-core-foundation",
+    "NSDate",
+    "NSGeometry",
+    "NSNotification",
+    "NSObjCRuntime",
+    "NSPathUtilities",
+    "NSRunLoop",
+    "NSString",
+    "NSTimer",
+    "NSURL",
+    "NSThread",
+] }
+objc2-web-kit = { version = "0.3.2", default-features = false, features = [
+    "std",
+    "block2",
+    "objc2-app-kit",
+    "objc2-core-foundation",
+    "WKNavigation",
+    "WKWebView",
+] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2-app-kit = { version = "0.3.2", default-features = false, features = [
+    "std",
+    "block2",
+    "objc2-core-foundation",
+    "NSApplication",
+    "NSGraphics",
+    "NSMenu",
+    "NSMenuItem",
+    "NSOpenPanel",
+    "NSPanel",
+    "NSResponder",
+    "NSRunningApplication",
+    "NSSavePanel",
+    "NSView",
+    "NSWindow",
+] }
