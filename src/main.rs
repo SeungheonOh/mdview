@@ -84,6 +84,73 @@ fn render_markdown(markdown: &str) -> String {
         padding: 15px;
     }}
 }}
+
+/* Find bar */
+#mdview-find-bar {{
+    display: none;
+    position: fixed;
+    top: 12px;
+    right: 12px;
+    z-index: 10000;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 8px;
+    background: rgba(246,246,246,0.92);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(0,0,0,0.12);
+    border-radius: 8px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.12);
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 13px;
+}}
+@media (prefers-color-scheme: dark) {{
+    #mdview-find-bar {{
+        background: rgba(50,50,50,0.92);
+        border-color: rgba(255,255,255,0.1);
+    }}
+}}
+#mdview-find-input {{
+    width: 200px;
+    padding: 4px 8px;
+    border: 1px solid rgba(0,0,0,0.15);
+    border-radius: 5px;
+    outline: none;
+    font-size: 13px;
+    background: white;
+    color: #333;
+}}
+@media (prefers-color-scheme: dark) {{
+    #mdview-find-input {{
+        background: rgba(30,30,30,0.9);
+        border-color: rgba(255,255,255,0.15);
+        color: #eee;
+    }}
+}}
+#mdview-find-input:focus {{
+    border-color: #6C5CE7;
+    box-shadow: 0 0 0 2px rgba(108,92,231,0.3);
+}}
+.mdview-find-btn {{
+    padding: 3px 8px;
+    border: 1px solid rgba(0,0,0,0.12);
+    border-radius: 5px;
+    background: rgba(255,255,255,0.8);
+    color: #333;
+    font-size: 12px;
+    cursor: pointer;
+    line-height: 1.4;
+}}
+@media (prefers-color-scheme: dark) {{
+    .mdview-find-btn {{
+        background: rgba(60,60,60,0.8);
+        border-color: rgba(255,255,255,0.1);
+        color: #ddd;
+    }}
+}}
+.mdview-find-btn:hover {{
+    background: rgba(108,92,231,0.15);
+}}
 </style>
 <script>
 {MERMAID_JS}
@@ -122,6 +189,75 @@ fn render_markdown(markdown: &str) -> String {
     window.addEventListener('scroll', function() {{
         sessionStorage.setItem('mdview_scrollY', window.scrollY.toString());
     }});
+</script>
+
+<!-- Find bar -->
+<div id="mdview-find-bar">
+    <input id="mdview-find-input" type="text" placeholder="Find..." autocomplete="off" spellcheck="false">
+    <button class="mdview-find-btn" id="mdview-find-prev" title="Previous (⇧⏎)">&lsaquo;</button>
+    <button class="mdview-find-btn" id="mdview-find-next" title="Next (⏎)">&rsaquo;</button>
+    <button class="mdview-find-btn" id="mdview-find-close" title="Close (Esc)">&times;</button>
+</div>
+<script>
+(function() {{
+    var bar = document.getElementById('mdview-find-bar');
+    var input = document.getElementById('mdview-find-input');
+    var nextBtn = document.getElementById('mdview-find-next');
+    var prevBtn = document.getElementById('mdview-find-prev');
+    var closeBtn = document.getElementById('mdview-find-close');
+
+    function doFind(backwards) {{
+        var text = input.value;
+        if (!text) return;
+        // window.find(string, caseSensitive, backwards, wrapAround)
+        window.find(text, false, backwards, true);
+    }}
+
+    function openFindBar() {{
+        bar.style.display = 'flex';
+        input.focus();
+        input.select();
+    }}
+
+    function closeFindBar() {{
+        bar.style.display = 'none';
+        input.value = '';
+        // Clear selection
+        window.getSelection().removeAllRanges();
+    }}
+
+    // Expose for native menu
+    window.mdviewOpenFind = openFindBar;
+
+    input.addEventListener('keydown', function(e) {{
+        if (e.key === 'Enter') {{
+            e.preventDefault();
+            doFind(e.shiftKey);
+        }} else if (e.key === 'Escape') {{
+            closeFindBar();
+        }}
+    }});
+
+    nextBtn.addEventListener('click', function() {{ doFind(false); }});
+    prevBtn.addEventListener('click', function() {{ doFind(true); }});
+    closeBtn.addEventListener('click', closeFindBar);
+
+    // ⌘F from keyboard (in case menu doesn't catch it)
+    document.addEventListener('keydown', function(e) {{
+        if ((e.metaKey || e.ctrlKey) && e.key === 'f') {{
+            e.preventDefault();
+            openFindBar();
+        }}
+        // ⌘G / ⌘⇧G for next/prev
+        if ((e.metaKey || e.ctrlKey) && e.key === 'g') {{
+            e.preventDefault();
+            doFind(e.shiftKey);
+        }}
+        if (e.key === 'Escape' && bar.style.display === 'flex') {{
+            closeFindBar();
+        }}
+    }});
+}})();
 </script>
 </body>
 </html>"#
@@ -165,7 +301,7 @@ define_class!(
             let mtm = self.mtm();
 
             let window = {
-                let content_rect = NSRect::new(NSPoint::new(0., 0.), NSSize::new(800., 600.));
+                let content_rect = NSRect::new(NSPoint::new(0., 0.), NSSize::new(1200., 900.));
                 let style = NSWindowStyleMask::Closable
                     | NSWindowStyleMask::Resizable
                     | NSWindowStyleMask::Titled
@@ -316,6 +452,15 @@ define_class!(
                 unsafe { web_view.evaluateJavaScript_completionHandler(&js, None) };
             }
         }
+
+        #[unsafe(method(performFind:))]
+        #[allow(non_snake_case)]
+        fn performFind(&self, _sender: *mut AnyObject) {
+            if let Some(web_view) = self.ivars().web_view.get() {
+                let js = NSString::from_str("window.mdviewOpenFind()");
+                unsafe { web_view.evaluateJavaScript_completionHandler(&js, None) };
+            }
+        }
     }
 );
 
@@ -439,6 +584,14 @@ fn build_menu_bar(mtm: MainThreadMarker) {
             ns_string!("Select All"),
             Some(sel!(selectAll:)),
             ns_string!("a"),
+        );
+    }
+    edit_menu.addItem(&NSMenuItem::separatorItem(mtm));
+    unsafe {
+        edit_menu.addItemWithTitle_action_keyEquivalent(
+            ns_string!("Find\u{2026}"),
+            Some(sel!(performFind:)),
+            ns_string!("f"),
         );
     }
     edit_menu_item.setSubmenu(Some(&edit_menu));
