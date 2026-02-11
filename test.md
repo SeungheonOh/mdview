@@ -1,6 +1,6 @@
 # Test Document
 
-This is a test of **mdview**, a minimal macOS Markdown viewer.
+This is a test of **mdiew**, a minimal macOS Markdown viewer.
 
 ## Features
 

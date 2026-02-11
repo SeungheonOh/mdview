@@ -1,10 +1,10 @@
 [package]
-name = "mdview"
+name = "mdiew"
 version = "0.1.4"
 edition = "2024"
 description = "A lightweight macOS markdown viewer with live reload"
 license = "BSD-3-Clause"
-repository = "https://github.com/SeungheonOh/mdview"
+repository = "https://github.com/SeungheonOh/mdiew"
 
 [dependencies]
 comrak = { version = "0.50.0", default-features = false, features = ["syntect"] }

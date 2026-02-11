@@ -1,13 +1,13 @@
-cask "mdview" do
+cask "mdiew" do
   arch arm: "aarch64", intel: "x86_64"
   version "0.1.1"
   sha256 arm:   "PLACEHOLDER",
          intel: "PLACEHOLDER"
 
-  url "https://github.com/SeungheonOh/mdview/releases/download/v#{version}/mdview-#{arch}-apple-darwin.app.zip"
-  name "mdview"
+  url "https://github.com/SeungheonOh/mdiew/releases/download/v#{version}/mdiew-#{arch}-apple-darwin.app.zip"
+  name "mdiew"
   desc "A fast, native macOS markdown viewer"
-  homepage "https://github.com/SeungheonOh/mdview"
+  homepage "https://github.com/SeungheonOh/mdiew"
 
   livecheck do
     url :url
@@ -16,5 +16,5 @@ cask "mdview" do
 
   depends_on macos: ">= :monterey"
 
-  app "mdview.app"
+  app "mdiew.app"
 end

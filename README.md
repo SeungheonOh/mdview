@@ -1,4 +1,4 @@
-# mdview
+# mdiew
 
 A fast, native macOS markdown viewer built with Rust.
 
@@ -19,14 +19,14 @@ Renders markdown files using a `WKWebView` with GitHub-flavored styling, Mermaid
 ### Homebrew
 
 ```sh
-brew tap SeungheonOh/mdview https://github.com/SeungheonOh/mdview
-brew install --cask mdview
+brew tap SeungheonOh/mdiew https://github.com/SeungheonOh/mdiew
+brew install --cask mdiew
 ```
 
 ### Install script (from GitHub Releases)
 
 ```sh
-curl --proto '=https' --tlsv1.2 -LsSf https://github.com/SeungheonOh/mdview/releases/latest/download/mdview-installer.sh | sh
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/SeungheonOh/mdiew/releases/latest/download/mdiew-installer.sh | sh
 ```
 
 ### Build from source
@@ -34,12 +34,12 @@ curl --proto '=https' --tlsv1.2 -LsSf https://github.com/SeungheonOh/mdview/rele
 Requires Rust and macOS.
 
 ```sh
-git clone https://github.com/SeungheonOh/mdview.git
-cd mdview
+git clone https://github.com/SeungheonOh/mdiew.git
+cd mdiew
 cargo build --release
 ```
 
-The binary will be at `target/release/mdview`.
+The binary will be at `target/release/mdiew`.
 
 ### Install as .app bundle
 
@@ -47,9 +47,9 @@ The binary will be at `target/release/mdview`.
 make install
 ```
 
-This builds the release binary, creates `mdview.app` in `/Applications`, and registers it with Launch Services.
+This builds the release binary, creates `mdiew.app` in `/Applications`, and registers it with Launch Services.
 
-To also set mdview as the default viewer for `.md` files:
+To also set mdiew as the default viewer for `.md` files:
 
 ```sh
 make default
@@ -60,7 +60,7 @@ Requires [duti](https://github.com/moretension/duti) (`brew install duti`).
 ## Usage
 
 ```sh
-mdview README.md
+mdiew README.md
 ```
 
 Or open any `.md` file from Finder after installing the .app bundle.

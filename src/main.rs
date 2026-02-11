@@ -86,7 +86,7 @@ fn render_markdown(markdown: &str) -> String {
 }}
 
 /* Find bar */
-#mdview-find-bar {{
+#mdiew-find-bar {{
     display: none;
     position: fixed;
     top: 12px;
@@ -105,12 +105,12 @@ fn render_markdown(markdown: &str) -> String {
     font-size: 13px;
 }}
 @media (prefers-color-scheme: dark) {{
-    #mdview-find-bar {{
+    #mdiew-find-bar {{
         background: rgba(50,50,50,0.92);
         border-color: rgba(255,255,255,0.1);
     }}
 }}
-#mdview-find-input {{
+#mdiew-find-input {{
     width: 200px;
     padding: 4px 8px;
     border: 1px solid rgba(0,0,0,0.15);
@@ -121,17 +121,17 @@ fn render_markdown(markdown: &str) -> String {
     color: #333;
 }}
 @media (prefers-color-scheme: dark) {{
-    #mdview-find-input {{
+    #mdiew-find-input {{
         background: rgba(30,30,30,0.9);
         border-color: rgba(255,255,255,0.15);
         color: #eee;
     }}
 }}
-#mdview-find-input:focus {{
+#mdiew-find-input:focus {{
     border-color: #6C5CE7;
     box-shadow: 0 0 0 2px rgba(108,92,231,0.3);
 }}
-.mdview-find-btn {{
+.mdiew-find-btn {{
     padding: 3px 8px;
     border: 1px solid rgba(0,0,0,0.12);
     border-radius: 5px;
@@ -142,13 +142,13 @@ fn render_markdown(markdown: &str) -> String {
     line-height: 1.4;
 }}
 @media (prefers-color-scheme: dark) {{
-    .mdview-find-btn {{
+    .mdiew-find-btn {{
         background: rgba(60,60,60,0.8);
         border-color: rgba(255,255,255,0.1);
         color: #ddd;
     }}
 }}
-.mdview-find-btn:hover {{
+.mdiew-find-btn:hover {{
     background: rgba(108,92,231,0.15);
 }}
 </style>
@@ -180,31 +180,31 @@ fn render_markdown(markdown: &str) -> String {
 }})();
 
     // Persist scroll position across live reloads.
-    var savedY = sessionStorage.getItem('mdview_scrollY');
+    var savedY = sessionStorage.getItem('mdiew_scrollY');
     if (savedY) {{
         requestAnimationFrame(function() {{
             window.scrollTo(0, parseInt(savedY));
         }});
     }}
     window.addEventListener('scroll', function() {{
-        sessionStorage.setItem('mdview_scrollY', window.scrollY.toString());
+        sessionStorage.setItem('mdiew_scrollY', window.scrollY.toString());
     }});
 </script>
 
 <!-- Find bar -->
-<div id="mdview-find-bar">
-    <input id="mdview-find-input" type="text" placeholder="Find..." autocomplete="off" spellcheck="false">
-    <button class="mdview-find-btn" id="mdview-find-prev" title="Previous (⇧⏎)">&lsaquo;</button>
-    <button class="mdview-find-btn" id="mdview-find-next" title="Next (⏎)">&rsaquo;</button>
-    <button class="mdview-find-btn" id="mdview-find-close" title="Close (Esc)">&times;</button>
+<div id="mdiew-find-bar">
+    <input id="mdiew-find-input" type="text" placeholder="Find..." autocomplete="off" spellcheck="false">
+    <button class="mdiew-find-btn" id="mdiew-find-prev" title="Previous (⇧⏎)">&lsaquo;</button>
+    <button class="mdiew-find-btn" id="mdiew-find-next" title="Next (⏎)">&rsaquo;</button>
+    <button class="mdiew-find-btn" id="mdiew-find-close" title="Close (Esc)">&times;</button>
 </div>
 <script>
 (function() {{
-    var bar = document.getElementById('mdview-find-bar');
-    var input = document.getElementById('mdview-find-input');
-    var nextBtn = document.getElementById('mdview-find-next');
-    var prevBtn = document.getElementById('mdview-find-prev');
-    var closeBtn = document.getElementById('mdview-find-close');
+    var bar = document.getElementById('mdiew-find-bar');
+    var input = document.getElementById('mdiew-find-input');
+    var nextBtn = document.getElementById('mdiew-find-next');
+    var prevBtn = document.getElementById('mdiew-find-prev');
+    var closeBtn = document.getElementById('mdiew-find-close');
 
     function doFind(backwards) {{
         var text = input.value;
@@ -227,7 +227,7 @@ fn render_markdown(markdown: &str) -> String {
     }}
 
     // Expose for native menu
-    window.mdviewOpenFind = openFindBar;
+    window.mdiewOpenFind = openFindBar;
 
     input.addEventListener('keydown', function(e) {{
         if (e.key === 'Enter') {{
@@ -332,7 +332,7 @@ define_class!(
                 .as_deref()
                 .and_then(|p| p.file_name())
                 .and_then(|n| n.to_str())
-                .unwrap_or("mdview")
+                .unwrap_or("mdiew")
                 .to_string();
             window.setTitle(&NSString::from_str(&title));
             window.makeKeyAndOrderFront(None);
@@ -457,7 +457,7 @@ define_class!(
         #[allow(non_snake_case)]
         fn performFind(&self, _sender: *mut AnyObject) {
             if let Some(web_view) = self.ivars().web_view.get() {
-                let js = NSString::from_str("window.mdviewOpenFind()");
+                let js = NSString::from_str("window.mdiewOpenFind()");
                 unsafe { web_view.evaluateJavaScript_completionHandler(&js, None) };
             }
         }
@@ -482,7 +482,7 @@ impl AppDelegate {
             let title = path
                 .file_name()
                 .and_then(|n| n.to_str())
-                .unwrap_or("mdview");
+                .unwrap_or("mdiew");
             window.setTitle(&NSString::from_str(title));
         }
 
@@ -517,10 +517,10 @@ fn build_menu_bar(mtm: MainThreadMarker) {
             ns_string!(""),
         )
     };
-    let app_menu = NSMenu::initWithTitle(NSMenu::alloc(mtm), ns_string!("mdview"));
+    let app_menu = NSMenu::initWithTitle(NSMenu::alloc(mtm), ns_string!("mdiew"));
     unsafe {
         app_menu.addItemWithTitle_action_keyEquivalent(
-            ns_string!("About mdview"),
+            ns_string!("About mdiew"),
             Some(sel!(orderFrontStandardAboutPanel:)),
             ns_string!(""),
         );
@@ -528,7 +528,7 @@ fn build_menu_bar(mtm: MainThreadMarker) {
     app_menu.addItem(&NSMenuItem::separatorItem(mtm));
     unsafe {
         app_menu.addItemWithTitle_action_keyEquivalent(
-            ns_string!("Quit mdview"),
+            ns_string!("Quit mdiew"),
             Some(sel!(terminate:)),
             ns_string!("q"),
         );

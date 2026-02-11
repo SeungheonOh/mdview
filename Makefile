@@ -1,5 +1,5 @@
-APP       := mdview
-BUNDLE_ID := com.sho.mdview
+APP       := mdiew
+BUNDLE_ID := com.sho.mdiew
 APP_DIR   := /Applications/$(APP).app
 CONTENTS  := $(APP_DIR)/Contents
 LSREGISTER := /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
@@ -20,7 +20,7 @@ install: build
 	$(LSREGISTER) -f "$(APP_DIR)"
 	@echo "Installed to $(APP_DIR)"
 
-# Set mdview as the default viewer for all markdown extensions.
+# Set mdiew as the default viewer for all markdown extensions.
 # Requires: brew install duti
 default: install
 	duti -s $(BUNDLE_ID) .md all
@@ -28,7 +28,7 @@ default: install
 	duti -s $(BUNDLE_ID) .mdown all
 	duti -s $(BUNDLE_ID) .mkd all
 	duti -s $(BUNDLE_ID) .mkdn all
-	@echo "mdview is now the default app for .md files."
+	@echo "mdiew is now the default app for .md files."
 
 uninstall:
 	rm -rf "$(APP_DIR)"
