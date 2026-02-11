@@ -1,6 +1,6 @@
 [package]
 name = "mdiew"
-version = "0.1.7"
+version = "0.1.8"
 edition = "2024"
 description = "A lightweight macOS markdown viewer with live reload"
 license = "BSD-3-Clause"
