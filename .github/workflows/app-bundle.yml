@@ -1,0 +1,90 @@
+name: App Bundle
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  bundle:
+    strategy:
+      matrix:
+        include:
+          - runner: macos-14
+            arch: aarch64
+            target: aarch64-apple-darwin
+          - runner: macos-15-intel
+            arch: x86_64
+            target: x86_64-apple-darwin
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build release binary
+        run: cargo build --release --target ${{ matrix.target }}
+      - name: Create .app bundle
+        run: |
+          mkdir -p mdview.app/Contents/MacOS mdview.app/Contents/Resources
+          cp target/${{ matrix.target }}/release/mdview mdview.app/Contents/MacOS/mdview
+          cp bundle/Info.plist mdview.app/Contents/Info.plist
+          cp assets/icon.icns mdview.app/Contents/Resources/icon.icns
+          codesign --force --sign - mdview.app
+      - name: Zip and upload
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          zip -r mdview-${{ matrix.arch }}-apple-darwin.app.zip mdview.app
+          gh release upload "${{ github.event.release.tag_name }}" mdview-${{ matrix.arch }}-apple-darwin.app.zip --clobber
+
+  update-cask:
+    needs: bundle
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download zips and update Cask
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="${{ github.event.release.tag_name }}"
+          version="${tag#v}"
+
+          gh release download "$tag" -p "mdview-aarch64-apple-darwin.app.zip" -p "mdview-x86_64-apple-darwin.app.zip"
+
+          sha_arm=$(sha256sum mdview-aarch64-apple-darwin.app.zip | cut -d' ' -f1)
+          sha_intel=$(sha256sum mdview-x86_64-apple-darwin.app.zip | cut -d' ' -f1)
+
+          cat > Casks/mdview.rb << EOF
+          cask "mdview" do
+            arch arm: "aarch64", intel: "x86_64"
+            version "${version}"
+            sha256 arm:   "${sha_arm}",
+                   intel: "${sha_intel}"
+
+            url "https://github.com/SeungheonOh/mdview/releases/download/v#{version}/mdview-#{arch}-apple-darwin.app.zip"
+            name "mdview"
+            desc "A fast, native macOS markdown viewer"
+            homepage "https://github.com/SeungheonOh/mdview"
+
+            livecheck do
+              url :url
+              strategy :github_latest
+            end
+
+            depends_on macos: ">= :monterey"
+
+            app "mdview.app"
+          end
+          EOF
+
+          # Remove leading whitespace from heredoc
+          sed -i 's/^          //' Casks/mdview.rb
+
+      - name: Commit updated Cask
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Casks/mdview.rb
+          git diff --cached --quiet && exit 0
+          git commit -m "update cask to ${{ github.event.release.tag_name }}"
+          git push
