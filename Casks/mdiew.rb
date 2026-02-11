@@ -17,4 +17,8 @@ cask "mdiew" do
   depends_on macos: ">= :monterey"
 
   app "mdiew.app"
+
+  postflight do
+    system_command "/usr/bin/xattr", args: ["-cr", "#{appdir}/mdiew.app"]
+  end
 end
