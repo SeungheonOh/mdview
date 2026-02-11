@@ -25,10 +25,15 @@ jobs:
         run: cargo build --release --target ${{ matrix.target }}
       - name: Create .app bundle
         run: |
+          version="${{ github.event.release.tag_name }}"
+          version="${version#v}"
           mkdir -p mdview.app/Contents/MacOS mdview.app/Contents/Resources
           cp target/${{ matrix.target }}/release/mdview mdview.app/Contents/MacOS/mdview
           cp bundle/Info.plist mdview.app/Contents/Info.plist
           cp assets/icon.icns mdview.app/Contents/Resources/icon.icns
+          # Stamp version from tag into Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $version" mdview.app/Contents/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $version" mdview.app/Contents/Info.plist
           codesign --force --sign - mdview.app
       - name: Zip and upload
         env:
