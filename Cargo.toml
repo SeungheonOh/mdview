@@ -2,6 +2,8 @@
 name = "mdview"
 version = "0.1.1"
 edition = "2024"
+description = "A lightweight macOS markdown viewer with live reload"
+license = "BSD-3-Clause"
 repository = "https://github.com/SeungheonOh/mdview"
 
 [dependencies]
