@@ -1,14 +1,16 @@
 name: App Bundle
 
 on:
-  release:
-    types: [published]
+  workflow_run:
+    workflows: ["Release"]
+    types: [completed]
 
 permissions:
   contents: write
 
 jobs:
   bundle:
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' }}
     strategy:
       matrix:
         include:
@@ -25,7 +27,7 @@ jobs:
         run: cargo build --release --target ${{ matrix.target }}
       - name: Create .app bundle
         run: |
-          version="${{ github.event.release.tag_name }}"
+          version="${{ github.event.workflow_run.head_branch }}"
           version="${version#v}"
           mkdir -p mdiew.app/Contents/MacOS mdiew.app/Contents/Resources
           cp target/${{ matrix.target }}/release/mdiew mdiew.app/Contents/MacOS/mdiew
@@ -40,7 +42,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           zip -r mdiew-${{ matrix.arch }}-apple-darwin.app.zip mdiew.app
-          gh release upload "${{ github.event.release.tag_name }}" mdiew-${{ matrix.arch }}-apple-darwin.app.zip --clobber
+          gh release upload "${{ github.event.workflow_run.head_branch }}" mdiew-${{ matrix.arch }}-apple-darwin.app.zip --clobber
 
   update-cask:
     needs: bundle
@@ -51,7 +53,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          tag="${{ github.event.release.tag_name }}"
+          tag="${{ github.event.workflow_run.head_branch }}"
           version="${tag#v}"
 
           gh release download "$tag" -p "mdiew-aarch64-apple-darwin.app.zip" -p "mdiew-x86_64-apple-darwin.app.zip"
@@ -91,5 +93,5 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add Casks/mdiew.rb
           git diff --cached --quiet && exit 0
-          git commit -m "update cask to ${{ github.event.release.tag_name }}"
+          git commit -m "update cask to ${{ github.event.workflow_run.head_branch }}"
           git push
