@@ -1,8 +1,8 @@
 cask "mdiew" do
   arch arm: "aarch64", intel: "x86_64"
-  version "0.1.8"
-  sha256 arm:   "07d796e63adaf2454acf6b8064bdf47f9c245063f86ad88ad11b5fb8014430ba",
-         intel: "28b681e63ffa84c49e99a9266bb6215236aa1d3d281f792904005a7e11a593b1"
+  version "0.1.10"
+  sha256 arm:   "b9422d0e0b1b16154919729c19137c9d8895121c5adf8522664b109b16332a7b",
+         intel: "bbbb51990fb2021702ce0bb1553dbb43196c0bf721a166dfa66afb271fcd60b8"
 
   url "https://github.com/SeungheonOh/mdiew/releases/download/v#{version}/mdiew-#{arch}-apple-darwin.app.zip"
   name "mdiew"
