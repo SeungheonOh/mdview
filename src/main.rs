@@ -71,6 +71,16 @@ fn render_markdown(markdown: &str) -> String {
 <style>
 {GITHUB_CSS}
 
+body {{
+    margin: 0;
+    background-color: #ffffff;
+}}
+@media (prefers-color-scheme: dark) {{
+    body {{
+        background-color: #0d1117;
+    }}
+}}
+
 .markdown-body {{
     box-sizing: border-box;
     min-width: 200px;
