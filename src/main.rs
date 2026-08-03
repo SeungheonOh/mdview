@@ -21,7 +21,8 @@ use objc2_foundation::{
 };
 use objc2_web_kit::WKWebView;
 
-use comrak::{markdown_to_html, Options};
+use comrak::{markdown_to_html_with_plugins, Options, options::Plugins};
+use comrak::plugins::syntect::SyntectAdapterBuilder;
 
 const GITHUB_CSS: &str = include_str!("../assets/github-markdown.css");
 const KATEX_CSS: &str = include_str!("../assets/katex.min.css");
@@ -62,9 +63,27 @@ fn comrak_options() -> Options<'static> {
     options
 }
 
+fn build_syntax_set() -> syntect::parsing::SyntaxSet {
+    let mut builder = syntect::parsing::SyntaxSet::load_defaults_newlines().into_builder();
+    let lean_syntax = include_str!("../assets/lean.sublime-syntax");
+    let syntax_def = syntect::parsing::syntax_definition::SyntaxDefinition::load_from_str(
+        lean_syntax,
+        true,
+        Some("lean"),
+    )
+    .expect("failed to parse lean.sublime-syntax");
+    builder.add(syntax_def);
+    builder.build()
+}
+
 fn render_markdown(markdown: &str) -> String {
     let options = comrak_options();
-    let html_body = markdown_to_html(markdown, &options);
+
+    let ss = build_syntax_set();
+    let adapter = SyntectAdapterBuilder::new().syntax_set(ss).css().build();
+    let mut plugins = Plugins::default();
+    plugins.render.codefence_syntax_highlighter = Some(&adapter);
+    let html_body = markdown_to_html_with_plugins(markdown, &options, &plugins);
 
     format!(
         r#"<!DOCTYPE html>
@@ -172,6 +191,137 @@ body {{
 .mdiew-find-btn:hover {{
     background: rgba(108,92,231,0.15);
 }}
+
+/* Mermaid diagram containers */
+.mermaid {{
+    cursor: pointer;
+    position: relative;
+}}
+.mermaid:hover {{
+    outline: 2px solid rgba(108,92,231,0.4);
+    outline-offset: 4px;
+    border-radius: 4px;
+}}
+.mermaid::after {{
+    content: 'Click to zoom';
+    position: absolute;
+    top: 4px;
+    right: 8px;
+    font-size: 11px;
+    color: #666;
+    background: rgba(255,255,255,0.85);
+    padding: 2px 6px;
+    border-radius: 4px;
+    opacity: 0;
+    transition: opacity 0.15s;
+    pointer-events: none;
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+}}
+@media (prefers-color-scheme: dark) {{
+    .mermaid::after {{
+        background: rgba(30,30,30,0.85);
+        color: #aaa;
+    }}
+}}
+.mermaid:hover::after {{
+    opacity: 1;
+}}
+
+/* Mermaid zoom overlay */
+#mermaid-overlay {{
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    z-index: 9999;
+    background: rgba(255,255,255,0.95);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}}
+@media (prefers-color-scheme: dark) {{
+    #mermaid-overlay {{
+        background: rgba(13,17,23,0.95);
+    }}
+}}
+#mermaid-overlay-viewport {{
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    cursor: grab;
+}}
+#mermaid-overlay-viewport:active {{
+    cursor: grabbing;
+}}
+#mermaid-overlay-content {{
+    transform-origin: 0 0;
+    display: inline-block;
+    padding: 40px;
+}}
+#mermaid-overlay-controls {{
+    position: fixed;
+    top: 12px;
+    right: 12px;
+    display: flex;
+    gap: 4px;
+    z-index: 10001;
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+}}
+.mermaid-ctrl-btn {{
+    padding: 6px 12px;
+    border: 1px solid rgba(0,0,0,0.12);
+    border-radius: 6px;
+    background: rgba(246,246,246,0.92);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    color: #333;
+    font-size: 14px;
+    cursor: pointer;
+    line-height: 1.2;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    user-select: none;
+}}
+@media (prefers-color-scheme: dark) {{
+    .mermaid-ctrl-btn {{
+        background: rgba(50,50,50,0.92);
+        border-color: rgba(255,255,255,0.1);
+        color: #ddd;
+    }}
+}}
+.mermaid-ctrl-btn:hover {{
+    background: rgba(108,92,231,0.15);
+}}
+#mermaid-overlay-zoom-level {{
+    position: fixed;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 12px;
+    color: #888;
+    z-index: 10001;
+    user-select: none;
+}}
+
+/* Syntax highlighting — GitHub colors */
+pre.syntax-highlighting {{ background: transparent; }}
+pre.syntax-highlighting .comment {{ color: #6a737d; font-style: italic; }}
+pre.syntax-highlighting .string {{ color: #032f62; }}
+pre.syntax-highlighting .constant {{ color: #005cc5; }}
+pre.syntax-highlighting .keyword,
+pre.syntax-highlighting .storage {{ color: #d73a49; }}
+pre.syntax-highlighting .entity {{ color: #6f42c1; }}
+pre.syntax-highlighting .support {{ color: #005cc5; }}
+pre.syntax-highlighting .variable {{ color: #e36209; }}
+pre.syntax-highlighting .punctuation {{ color: inherit; }}
+@media (prefers-color-scheme: dark) {{
+    pre.syntax-highlighting .comment {{ color: #8b949e; }}
+    pre.syntax-highlighting .string {{ color: #a5d6ff; }}
+    pre.syntax-highlighting .constant {{ color: #79c0ff; }}
+    pre.syntax-highlighting .keyword,
+    pre.syntax-highlighting .storage {{ color: #ff7b72; }}
+    pre.syntax-highlighting .entity {{ color: #d2a8ff; }}
+    pre.syntax-highlighting .support {{ color: #79c0ff; }}
+    pre.syntax-highlighting .variable {{ color: #ffa657; }}
+}}
 </style>
 <script>
 {MERMAID_JS}
@@ -230,6 +380,172 @@ body {{
     window.addEventListener('scroll', function() {{
         sessionStorage.setItem('mdiew_scrollY', window.scrollY.toString());
     }});
+</script>
+
+<!-- Mermaid zoom overlay -->
+<div id="mermaid-overlay">
+    <div id="mermaid-overlay-controls">
+        <button class="mermaid-ctrl-btn" id="mermaid-zoom-in" title="Zoom in">+</button>
+        <button class="mermaid-ctrl-btn" id="mermaid-zoom-out" title="Zoom out">&minus;</button>
+        <button class="mermaid-ctrl-btn" id="mermaid-zoom-reset" title="Reset zoom">1:1</button>
+        <button class="mermaid-ctrl-btn" id="mermaid-zoom-fit" title="Fit to screen">Fit</button>
+        <button class="mermaid-ctrl-btn" id="mermaid-close" title="Close (Esc)">&times;</button>
+    </div>
+    <div id="mermaid-overlay-viewport">
+        <div id="mermaid-overlay-content"></div>
+    </div>
+    <div id="mermaid-overlay-zoom-level"></div>
+</div>
+<script>
+(function() {{
+    var overlay = document.getElementById('mermaid-overlay');
+    var viewport = document.getElementById('mermaid-overlay-viewport');
+    var content = document.getElementById('mermaid-overlay-content');
+    var zoomLabel = document.getElementById('mermaid-overlay-zoom-level');
+
+    var scale = 1;
+    var translateX = 0;
+    var translateY = 0;
+    var isDragging = false;
+    var dragStartX = 0;
+    var dragStartY = 0;
+    var dragStartTX = 0;
+    var dragStartTY = 0;
+
+    function updateTransform() {{
+        content.style.transform = 'translate(' + translateX + 'px, ' + translateY + 'px) scale(' + scale + ')';
+        zoomLabel.textContent = Math.round(scale * 100) + '%';
+    }}
+
+    function fitToScreen() {{
+        var svg = content.querySelector('svg');
+        if (!svg) return;
+        var svgW = svg.getBoundingClientRect().width / scale;
+        var svgH = svg.getBoundingClientRect().height / scale;
+        var vw = viewport.clientWidth - 80;
+        var vh = viewport.clientHeight - 80;
+        scale = Math.min(vw / svgW, vh / svgH, 2);
+        translateX = (viewport.clientWidth - svgW * scale) / 2;
+        translateY = (viewport.clientHeight - svgH * scale) / 2;
+        updateTransform();
+    }}
+
+    function openOverlay(mermaidEl) {{
+        var svg = mermaidEl.querySelector('svg');
+        if (!svg) return;
+        content.innerHTML = '';
+        var clone = svg.cloneNode(true);
+        clone.style.maxWidth = 'none';
+        clone.style.width = '';
+        clone.style.height = '';
+        content.appendChild(clone);
+        overlay.style.display = 'block';
+        scale = 1;
+        translateX = 0;
+        translateY = 0;
+        updateTransform();
+        // Slight delay so layout settles, then fit
+        requestAnimationFrame(function() {{ fitToScreen(); }});
+    }}
+
+    function closeOverlay() {{
+        overlay.style.display = 'none';
+        content.innerHTML = '';
+    }}
+
+    // Click on mermaid diagrams to open overlay
+    document.addEventListener('click', function(e) {{
+        var el = e.target.closest('.mermaid');
+        if (el && !overlay.contains(e.target)) {{
+            e.preventDefault();
+            openOverlay(el);
+        }}
+    }});
+
+    // Close button
+    document.getElementById('mermaid-close').addEventListener('click', closeOverlay);
+
+    // Zoom controls
+    document.getElementById('mermaid-zoom-in').addEventListener('click', function() {{
+        var cx = viewport.clientWidth / 2;
+        var cy = viewport.clientHeight / 2;
+        var factor = 1.25;
+        translateX = cx - (cx - translateX) * factor;
+        translateY = cy - (cy - translateY) * factor;
+        scale *= factor;
+        updateTransform();
+    }});
+    document.getElementById('mermaid-zoom-out').addEventListener('click', function() {{
+        var cx = viewport.clientWidth / 2;
+        var cy = viewport.clientHeight / 2;
+        var factor = 0.8;
+        translateX = cx - (cx - translateX) * factor;
+        translateY = cy - (cy - translateY) * factor;
+        scale = Math.max(0.1, scale * factor);
+        updateTransform();
+    }});
+    document.getElementById('mermaid-zoom-reset').addEventListener('click', function() {{
+        scale = 1;
+        translateX = (viewport.clientWidth - content.scrollWidth) / 2;
+        translateY = (viewport.clientHeight - content.scrollHeight) / 2;
+        updateTransform();
+    }});
+    document.getElementById('mermaid-zoom-fit').addEventListener('click', fitToScreen);
+
+    // Scroll to zoom (centered on mouse)
+    viewport.addEventListener('wheel', function(e) {{
+        e.preventDefault();
+        var rect = viewport.getBoundingClientRect();
+        var mx = e.clientX - rect.left;
+        var my = e.clientY - rect.top;
+        var factor = e.deltaY < 0 ? 1.1 : 0.9;
+        var newScale = Math.max(0.1, Math.min(10, scale * factor));
+        var ratio = newScale / scale;
+        translateX = mx - (mx - translateX) * ratio;
+        translateY = my - (my - translateY) * ratio;
+        scale = newScale;
+        updateTransform();
+    }}, {{ passive: false }});
+
+    // Drag to pan
+    viewport.addEventListener('mousedown', function(e) {{
+        if (e.target.closest('#mermaid-overlay-controls')) return;
+        isDragging = true;
+        dragStartX = e.clientX;
+        dragStartY = e.clientY;
+        dragStartTX = translateX;
+        dragStartTY = translateY;
+    }});
+    window.addEventListener('mousemove', function(e) {{
+        if (!isDragging) return;
+        translateX = dragStartTX + (e.clientX - dragStartX);
+        translateY = dragStartTY + (e.clientY - dragStartY);
+        updateTransform();
+    }});
+    window.addEventListener('mouseup', function() {{
+        isDragging = false;
+    }});
+
+    // Escape to close
+    document.addEventListener('keydown', function(e) {{
+        if (overlay.style.display === 'block') {{
+            if (e.key === 'Escape') {{
+                closeOverlay();
+                e.stopPropagation();
+            }}
+            // Keyboard zoom: +/- keys
+            if (e.key === '=' || e.key === '+') {{
+                document.getElementById('mermaid-zoom-in').click();
+            }}
+            if (e.key === '-') {{
+                document.getElementById('mermaid-zoom-out').click();
+            }}
+            if (e.key === '0') {{
+                fitToScreen();
+            }}
+        }}
+    }});
+}})();
 </script>
 
 <!-- Find bar -->

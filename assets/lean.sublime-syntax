@@ -1,0 +1,105 @@
+%YAML 1.2
+---
+name: Lean
+file_extensions: [lean]
+scope: source.lean
+
+contexts:
+  main:
+    # Line comments
+    - match: '--'
+      scope: punctuation.definition.comment.lean
+      push: line_comment
+
+    # Block comments
+    - match: '/-'
+      scope: punctuation.definition.comment.begin.lean
+      push: block_comment
+
+    # Strings
+    - match: '"'
+      scope: punctuation.definition.string.begin.lean
+      push: string
+
+    # Character literals
+    - match: "'.'"
+      scope: string.quoted.single.lean
+
+    # Numeric literals
+    - match: '\b(0x[0-9a-fA-F_]+|0b[01_]+|0o[0-7_]+|[0-9][0-9_]*\.?[0-9_]*([eE][+-]?[0-9_]+)?)\b'
+      scope: constant.numeric.lean
+
+    # Directives
+    - match: '#(check|eval|print|reduce|help)\b'
+      scope: keyword.other.directive.lean
+
+    # Declaration keywords
+    - match: '\b(def|theorem|lemma|example|abbrev|noncomputable|opaque|axiom|constant)\b'
+      scope: storage.type.function.lean
+      push: declaration_name
+
+    # Structure/type declaration keywords
+    - match: '\b(structure|inductive|class|instance|where)\b'
+      scope: storage.type.lean
+
+    # Tactic keywords
+    - match: '\b(by|simp|rfl|exact|apply|intro|intros|induction|cases|constructor|rw|rewrite|calc|omega|decide|trivial|norm_num|ring|linarith|assumption|contradiction|exfalso|ext|funext|congr|specialize|obtain|rcases|rintro|refine|use|existsi|left|right|injection|subst|clear|rename|revert|generalize|suffices|show|have|let|at|with)\b'
+      scope: keyword.other.tactic.lean
+
+    # Namespace/module keywords
+    - match: '\b(import|open|namespace|section|end|in|export|mutual|universe|variable|set_option|attribute|macro|syntax|notation|declare_syntax_cat|elab|macro_rules)\b'
+      scope: keyword.control.lean
+
+    # Control flow
+    - match: '\b(if|then|else|match|do|for|while|return|fun|from|break|continue)\b'
+      scope: keyword.control.lean
+
+    # Modifiers
+    - match: '\b(private|protected|partial|unsafe|scoped|local)\b'
+      scope: storage.modifier.lean
+
+    # Boolean/special constants
+    - match: '\b(true|false|True|False)\b'
+      scope: constant.language.lean
+
+    # Built-in types
+    - match: '\b(Nat|Int|Float|Bool|String|Char|Unit|List|Array|Option|IO|Type|Prop|Sort)\b'
+      scope: support.type.lean
+
+    # Operators
+    - match: ':=|=>|→|←|↔|∀|∃|λ|⟨|⟩|≤|≥|≠|∧|∨|¬|⊢|▸|\|>|<\||>>=|>>|<<|&&|\|\||::|[+\-*/^%<>=!&|~@$?]+'
+      scope: keyword.operator.lean
+
+    # Pipe/dot notation
+    - match: '\|'
+      scope: punctuation.separator.lean
+
+  declaration_name:
+    - match: '\s+'
+      scope: meta.function.lean
+    - match: '[a-zA-Z_][a-zA-Z0-9_]*'
+      scope: entity.name.function.lean
+      pop: true
+    - match: ''
+      pop: true
+
+  line_comment:
+    - meta_scope: comment.line.double-dash.lean
+    - match: $
+      pop: true
+
+  block_comment:
+    - meta_scope: comment.block.lean
+    - match: '/-'
+      push: block_comment
+    - match: '-/'
+      scope: punctuation.definition.comment.end.lean
+      pop: true
+
+  string:
+    - meta_scope: string.quoted.double.lean
+    - match: '\\.'
+      scope: constant.character.escape.lean
+    - match: '"'
+      scope: punctuation.definition.string.end.lean
+      pop: true
