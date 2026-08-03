@@ -2,12 +2,13 @@
 
 A fast, native macOS markdown viewer built with Rust.
 
-Renders markdown files using a `WKWebView` with GitHub-flavored styling, Mermaid diagram support, syntax highlighting, and live file watching.
+Renders markdown files using a `WKWebView` with GitHub-flavored styling, Mermaid diagrams, LaTeX math, syntax highlighting, and live file watching.
 
 ## Features
 
 - GitHub-flavored markdown (tables, task lists, footnotes, strikethrough, autolinks)
 - Mermaid diagram rendering
+- Offline LaTeX math rendering via KaTeX
 - Syntax highlighting via syntect
 - Live reload on file changes with scroll position preservation
 - Find in page (Cmd+F)
@@ -64,6 +65,20 @@ mdiew README.md
 ```
 
 Or open any `.md` file from Finder after installing the .app bundle.
+
+### LaTeX math
+
+Use single dollar signs for inline math and double dollar signs for display math:
+
+```markdown
+Euler's identity is $e^{i\pi} + 1 = 0$.
+
+$$
+\int_{-\infty}^{\infty} e^{-x^2}\,dx = \sqrt{\pi}
+$$
+```
+
+GitLab-style math code is also supported with ``$`...`$`` for inline math and fenced `math` blocks for display math.
 
 ### Keyboard shortcuts
 

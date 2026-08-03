@@ -23,7 +23,8 @@ fn main() {
 | Tables | Working |
 | Code blocks | Working |
 | Task lists | Working |
-| Mermaid | Coming soon |
+| Mermaid | Working |
+| LaTeX | Working |
 
 ## Blockquote
 
@@ -53,4 +54,16 @@ graph LR
     A[Start] --> B{Decision}
     B -->|Yes| C[OK]
     B -->|No| D[Not OK]
+```
+
+## LaTeX
+
+Euler's identity is $e^{i\pi} + 1 = 0$.
+
+$$
+\int_{-\infty}^{\infty} e^{-x^2}\,dx = \sqrt{\pi}
+$$
+
+```math
+\sum_{n=1}^{\infty} \frac{1}{n^2} = \frac{\pi^2}{6}
 ```
