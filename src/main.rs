@@ -24,6 +24,8 @@ use objc2_web_kit::WKWebView;
 use comrak::{markdown_to_html, Options};
 
 const GITHUB_CSS: &str = include_str!("../assets/github-markdown.css");
+const KATEX_CSS: &str = include_str!("../assets/katex.min.css");
+const KATEX_JS: &str = include_str!("../assets/katex.min.js");
 const MERMAID_JS: &str = include_str!("../assets/mermaid.min.js");
 
 /// The currently displayed file path. Protected by a Mutex for updates from open-file.
@@ -54,6 +56,8 @@ fn comrak_options() -> Options<'static> {
     options.extension.footnotes = true;
     options.extension.description_lists = true;
     options.extension.multiline_block_quotes = true;
+    options.extension.math_dollars = true;
+    options.extension.math_code = true;
     options.render.r#unsafe = true;
     options
 }
@@ -70,6 +74,7 @@ fn render_markdown(markdown: &str) -> String {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
 {GITHUB_CSS}
+{KATEX_CSS}
 
 body {{
     margin: 0;
@@ -93,6 +98,12 @@ body {{
     .markdown-body {{
         padding: 15px;
     }}
+}}
+
+.katex-display {{
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 0.25em 0;
 }}
 
 /* Find bar */
@@ -165,6 +176,9 @@ body {{
 <script>
 {MERMAID_JS}
 </script>
+<script>
+{KATEX_JS}
+</script>
 </head>
 <body>
 <article class="markdown-body">
@@ -172,6 +186,23 @@ body {{
 </article>
 <script>
 (function() {{
+    document.querySelectorAll('[data-math-style]').forEach(function(mathEl) {{
+        var displayMode = mathEl.dataset.mathStyle === 'display';
+        var source = mathEl.textContent;
+        var pre = mathEl.parentElement && mathEl.parentElement.tagName === 'PRE'
+            ? mathEl.parentElement
+            : null;
+        var container = document.createElement(pre ? 'div' : 'span');
+        container.className = displayMode ? 'mdiew-math-display' : 'mdiew-math-inline';
+
+        katex.render(source, container, {{
+            displayMode: displayMode,
+            throwOnError: false
+        }});
+
+        (pre || mathEl).replaceWith(container);
+    }});
+
     // Convert comrak's mermaid code blocks into mermaid-renderable divs.
     document.querySelectorAll('pre > code.language-mermaid').forEach(function(codeEl) {{
         var pre = codeEl.parentElement;
@@ -714,4 +745,27 @@ fn main() {
     app.setDelegate(Some(object));
 
     app.run();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{KATEX_CSS, render_markdown};
+
+    #[test]
+    fn renders_dollar_and_code_math_nodes() {
+        let html = render_markdown(
+            "Inline $x^2$ and $`y^2`$.\n\n$$\nx + y\n$$\n\n```math\n\\sum_n n\n```",
+        );
+
+        assert!(html.contains("<span data-math-style=\"inline\">x^2</span>"));
+        assert!(html.contains("<code data-math-style=\"inline\">y^2</code>"));
+        assert!(html.contains("class=\"language-math\" data-math-style=\"display\""));
+        assert!(html.contains("katex.render(source, container"));
+    }
+
+    #[test]
+    fn embeds_katex_fonts_for_offline_rendering() {
+        assert!(KATEX_CSS.contains("data:font/woff2;base64,"));
+        assert!(!KATEX_CSS.contains("url(fonts/"));
+    }
 }
