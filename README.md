@@ -11,6 +11,10 @@ Renders markdown files using a `WKWebView` with GitHub-flavored styling, Mermaid
 - Offline LaTeX math rendering via KaTeX
 - Syntax highlighting via syntect
 - Live reload on file changes with scroll position preservation
+- Integrated local and SSH remote file pickers
+- Saved remote servers and per-server directory memory
+- macOS Keychain storage for SSH passwords and key passphrases
+- On-demand remote connections with local file caching
 - Find in page (Cmd+F)
 - Export to HTML/PDF
 - Open as .app bundle with Finder integration
@@ -66,6 +70,23 @@ mdiew README.md
 
 Or open any `.md` file from Finder after installing the .app bundle.
 
+### Remote files
+
+Choose **File → Open Remote…** to connect to a machine over SSH. Add a server using
+the same host, username, port, and optional identity file you would use with the
+system `ssh` command. Existing aliases and options from `~/.ssh/config` continue to
+apply.
+
+mdiew verifies new servers before saving them, remembers the last directory used on
+each server, and stores passwords or key passphrases in macOS Keychain. Remote files
+are copied into `~/Library/Caches/mdiew/remote-files` before rendering. Connections
+are opened only while listing a directory, opening a file, or reloading; mdiew does
+not leave an SSH control connection running.
+
+Saved connection details are stored in
+`~/Library/Application Support/mdiew/remote-connections.json`. Removing a server
+from the remote picker also removes its mdiew-managed Keychain credentials.
+
 ### LaTeX math
 
 Use single dollar signs for inline math and double dollar signs for display math:
@@ -85,6 +106,7 @@ GitLab-style math code is also supported with ``$`...`$`` for inline math and fe
 | Shortcut | Action |
 |----------|--------|
 | Cmd+O | Open file |
+| File → Open Remote… | Open remote file over SSH |
 | Cmd+F | Find in page |
 | Cmd+E | Export to HTML |
 | Cmd+Shift+E | Export to PDF |
