@@ -62,11 +62,21 @@ impl Connection {
         if host.is_empty() {
             return Err("Host is required".to_string());
         }
+        if host.starts_with('-') || host.chars().any(char::is_whitespace) {
+            return Err("Host must be an SSH hostname or config alias".to_string());
+        }
         if port == 0 {
             return Err("Port must be between 1 and 65535".to_string());
         }
 
         let username = cleaned_optional(username);
+        if username.as_deref().is_some_and(|username| {
+            username.starts_with('-')
+                || username.contains('@')
+                || username.chars().any(char::is_whitespace)
+        }) {
+            return Err("Username contains unsupported characters".to_string());
+        }
         let identity_file = cleaned_optional(identity_file);
         let nickname = if nickname.trim().is_empty() {
             host.clone()
@@ -145,7 +155,7 @@ pub fn find_connection(connection_id: &str) -> Option<Connection> {
 }
 
 pub fn run_askpass() -> i32 {
-    let prompt = std::env::args().nth(2).unwrap_or_default();
+    let prompt = std::env::args().nth(1).unwrap_or_default();
     let connection_id = std::env::var("MDIEW_SSH_CONNECTION_ID").unwrap_or_default();
     if connection_id.is_empty() {
         return 1;
@@ -356,6 +366,9 @@ fn cache_path(connection: &Connection, remote_path: &str) -> PathBuf {
     connection.id.hash(&mut hasher);
     remote_path.hash(&mut hasher);
     let hash = hasher.finish();
+    let mut connection_hasher = DefaultHasher::new();
+    connection.id.hash(&mut connection_hasher);
+    let connection_hash = connection_hasher.finish();
     let file_name = Path::new(remote_path)
         .file_name()
         .and_then(|name| name.to_str())
@@ -365,7 +378,7 @@ fn cache_path(connection: &Connection, remote_path: &str) -> PathBuf {
         .join("Caches")
         .join("mdiew")
         .join("remote-files")
-        .join(&connection.id)
+        .join(format!("{connection_hash:016x}"))
         .join(format!("{hash:016x}-{file_name}"))
 }
 
@@ -538,6 +551,17 @@ mod tests {
     #[test]
     fn rejects_empty_hosts() {
         assert!(Connection::new("Name".into(), "  ".into(), None, 22, None).is_err());
+        assert!(Connection::new("Name".into(), "-oProxyCommand=x".into(), None, 22, None).is_err());
+        assert!(
+            Connection::new(
+                "Name".into(),
+                "example.com".into(),
+                Some("-oProxyCommand=x".into()),
+                22,
+                None
+            )
+            .is_err()
+        );
     }
 
     #[test]

@@ -6,7 +6,7 @@ mod remote_picker;
 use core::cell::{Cell, OnceCell};
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, OnceLock};
 use std::time::Duration;
@@ -804,12 +804,11 @@ define_class!(
             panel.setAllowsMultipleSelection(false);
 
             let response = panel.runModal();
-            if response == NSModalResponseOK {
-                if let Some(url) = panel.URL() {
-                    if let Some(path) = url.path() {
-                        self.open_file(PathBuf::from(path.to_string()));
-                    }
-                }
+            if response == NSModalResponseOK
+                && let Some(url) = panel.URL()
+                && let Some(path) = url.path()
+            {
+                self.open_file(PathBuf::from(path.to_string()));
             }
         }
 
@@ -898,11 +897,11 @@ impl AppDelegate {
         *self.ivars().debouncer.borrow_mut() = Some(debouncer);
 
         // Re-render.
-        if let Some(web_view) = self.ivars().web_view.get() {
-            if let Some(html) = load_and_render() {
-                let html_ns = NSString::from_str(&html);
-                unsafe { web_view.loadHTMLString_baseURL(&html_ns, None) };
-            }
+        if let Some(web_view) = self.ivars().web_view.get()
+            && let Some(html) = load_and_render()
+        {
+            let html_ns = NSString::from_str(&html);
+            unsafe { web_view.loadHTMLString_baseURL(&html_ns, None) };
         }
     }
 
@@ -1253,9 +1252,7 @@ fn build_menu_bar(mtm: MainThreadMarker) {
 
 // ── File Watcher ──────────────────────────────────────────────────────
 
-fn start_file_watcher(
-    path: &PathBuf,
-) -> notify_debouncer_mini::Debouncer<notify::RecommendedWatcher> {
+fn start_file_watcher(path: &Path) -> notify_debouncer_mini::Debouncer<notify::RecommendedWatcher> {
     // Watch the parent directory instead of the file directly.
     // Many editors (vim, VS Code, etc.) save via write-to-temp + atomic rename,
     // which replaces the inode and breaks a direct file watch.
@@ -1319,10 +1316,7 @@ fn start_reload_timer(delegate: &AppDelegate) {
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
-    if args
-        .get(1)
-        .is_some_and(|argument| argument == "--ssh-askpass")
-    {
+    if std::env::var_os("MDIEW_SSH_CONNECTION_ID").is_some() {
         std::process::exit(remote::run_askpass());
     }
     if args.len() >= 2 {
