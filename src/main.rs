@@ -1,5 +1,7 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 
+mod remote;
+
 use core::cell::OnceCell;
 use std::cell::RefCell;
 use std::path::PathBuf;
@@ -10,19 +12,19 @@ use std::time::Duration;
 use notify_debouncer_mini::{new_debouncer, notify};
 use objc2::rc::Retained;
 use objc2::runtime::{AnyObject, ProtocolObject};
-use objc2::{define_class, msg_send, sel, DefinedClass, MainThreadMarker, MainThreadOnly};
+use objc2::{DefinedClass, MainThreadMarker, MainThreadOnly, define_class, msg_send, sel};
 use objc2_app_kit::{
     NSApplication, NSApplicationActivationPolicy, NSApplicationDelegate, NSBackingStoreType,
     NSMenu, NSMenuItem, NSModalResponseOK, NSOpenPanel, NSWindow, NSWindowStyleMask,
 };
 use objc2_foundation::{
-    ns_string, NSNotification, NSObject, NSObjectProtocol, NSPoint, NSRect, NSRunLoopCommonModes,
-    NSSize, NSString,
+    NSNotification, NSObject, NSObjectProtocol, NSPoint, NSRect, NSRunLoopCommonModes, NSSize,
+    NSString, ns_string,
 };
 use objc2_web_kit::WKWebView;
 
-use comrak::{markdown_to_html_with_plugins, Options, options::Plugins};
 use comrak::plugins::syntect::SyntectAdapterBuilder;
+use comrak::{Options, markdown_to_html_with_plugins, options::Plugins};
 
 const GITHUB_CSS: &str = include_str!("../assets/github-markdown.css");
 const KATEX_CSS: &str = include_str!("../assets/katex.min.css");
@@ -836,10 +838,7 @@ impl AppDelegate {
 
         // Update window title.
         if let Some(window) = self.ivars().window.get() {
-            let title = path
-                .file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or("mdiew");
+            let title = path.file_name().and_then(|n| n.to_str()).unwrap_or("mdiew");
             window.setTitle(&NSString::from_str(title));
         }
 
@@ -990,7 +989,9 @@ fn build_menu_bar(mtm: MainThreadMarker) {
 
 // ── File Watcher ──────────────────────────────────────────────────────
 
-fn start_file_watcher(path: &PathBuf) -> notify_debouncer_mini::Debouncer<notify::RecommendedWatcher> {
+fn start_file_watcher(
+    path: &PathBuf,
+) -> notify_debouncer_mini::Debouncer<notify::RecommendedWatcher> {
     // Watch the parent directory instead of the file directly.
     // Many editors (vim, VS Code, etc.) save via write-to-temp + atomic rename,
     // which replaces the inode and breaks a direct file watch.
@@ -1003,17 +1004,24 @@ fn start_file_watcher(path: &PathBuf) -> notify_debouncer_mini::Debouncer<notify
         .expect("watched path must have a parent directory")
         .to_path_buf();
 
-    let mut debouncer = new_debouncer(Duration::from_millis(200), move |result: Result<Vec<notify_debouncer_mini::DebouncedEvent>, notify::Error>| match result {
-        Ok(events) => {
-            let relevant = events.iter().any(|e| e.path.file_name() == Some(&file_name));
-            if relevant {
-                NEEDS_RELOAD.store(true, Ordering::Relaxed);
+    let mut debouncer = new_debouncer(
+        Duration::from_millis(200),
+        move |result: Result<Vec<notify_debouncer_mini::DebouncedEvent>, notify::Error>| {
+            match result {
+                Ok(events) => {
+                    let relevant = events
+                        .iter()
+                        .any(|e| e.path.file_name() == Some(&file_name));
+                    if relevant {
+                        NEEDS_RELOAD.store(true, Ordering::Relaxed);
+                    }
+                }
+                Err(err) => {
+                    eprintln!("File watch error: {err}");
+                }
             }
-        }
-        Err(err) => {
-            eprintln!("File watch error: {err}");
-        }
-    })
+        },
+    )
     .expect("Failed to create file watcher");
 
     debouncer
@@ -1047,6 +1055,12 @@ fn start_reload_timer(delegate: &AppDelegate) {
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
+    if args
+        .get(1)
+        .is_some_and(|argument| argument == "--ssh-askpass")
+    {
+        std::process::exit(remote::run_askpass());
+    }
     if args.len() >= 2 {
         let path = std::fs::canonicalize(&args[1]).unwrap_or_else(|_| PathBuf::from(&args[1]));
         set_file_path(path);
