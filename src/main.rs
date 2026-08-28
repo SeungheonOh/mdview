@@ -1,9 +1,11 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 
 mod remote;
+mod remote_picker;
 
-use core::cell::OnceCell;
+use core::cell::{Cell, OnceCell};
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, OnceLock};
@@ -21,7 +23,9 @@ use objc2_foundation::{
     NSNotification, NSObject, NSObjectProtocol, NSPoint, NSRect, NSRunLoopCommonModes, NSSize,
     NSString, ns_string,
 };
-use objc2_web_kit::WKWebView;
+use objc2_web_kit::{
+    WKNavigationAction, WKNavigationActionPolicy, WKNavigationDelegate, WKWebView,
+};
 
 use comrak::plugins::syntect::SyntectAdapterBuilder;
 use comrak::{Options, markdown_to_html_with_plugins, options::Plugins};
@@ -643,6 +647,8 @@ struct AppDelegateIvars {
     window: OnceCell<Retained<NSWindow>>,
     web_view: OnceCell<Retained<WKWebView>>,
     debouncer: RefCell<Option<notify_debouncer_mini::Debouncer<notify::RecommendedWatcher>>>,
+    remote_document: RefCell<Option<remote::RemoteDocument>>,
+    picker_open: Cell<bool>,
 }
 
 define_class!(
@@ -678,6 +684,8 @@ define_class!(
 
             let web_view =
                 unsafe { WKWebView::initWithFrame(WKWebView::alloc(mtm), NSRect::ZERO) };
+            let navigation_delegate = ProtocolObject::from_ref(self);
+            unsafe { web_view.setNavigationDelegate(Some(navigation_delegate)) };
 
             let html = load_and_render()
                 .unwrap_or_else(|| render_markdown("*Open a file with* **File → Open** *(⌘O)*"));
@@ -743,6 +751,30 @@ define_class!(
         }
     }
 
+    unsafe impl WKNavigationDelegate for AppDelegate {
+        #[unsafe(method(webView:decidePolicyForNavigationAction:decisionHandler:))]
+        #[allow(non_snake_case)]
+        unsafe fn webView_decidePolicyForNavigationAction_decisionHandler(
+            &self,
+            _web_view: &WKWebView,
+            navigation_action: &WKNavigationAction,
+            decision_handler: &block2::DynBlock<dyn Fn(WKNavigationActionPolicy)>,
+        ) {
+            let absolute_url = unsafe { navigation_action.request() }
+                .URL()
+                .and_then(|url| url.absoluteString())
+                .map(|url| url.to_string());
+            if let Some(absolute_url) = absolute_url
+                && absolute_url.starts_with("mdiew://")
+            {
+                decision_handler.call((WKNavigationActionPolicy::Cancel,));
+                self.handle_remote_action(&absolute_url);
+                return;
+            }
+            decision_handler.call((WKNavigationActionPolicy::Allow,));
+        }
+    }
+
     impl AppDelegate {
         #[unsafe(method(checkReload:))]
         #[allow(non_snake_case)]
@@ -779,6 +811,18 @@ define_class!(
                     }
                 }
             }
+        }
+
+        #[unsafe(method(openRemoteDocument:))]
+        #[allow(non_snake_case)]
+        fn openRemoteDocument(&self, _sender: *mut AnyObject) {
+            self.show_remote_connections(None);
+        }
+
+        #[unsafe(method(reloadDocument:))]
+        #[allow(non_snake_case)]
+        fn reloadDocument(&self, _sender: *mut AnyObject) {
+            self.reload_current_document();
         }
 
         #[unsafe(method(zoomIn:))]
@@ -829,6 +873,8 @@ impl AppDelegate {
             window: OnceCell::new(),
             web_view: OnceCell::new(),
             debouncer: RefCell::new(None),
+            remote_document: RefCell::new(None),
+            picker_open: Cell::new(false),
         });
         unsafe { msg_send![super(this), init] }
     }
@@ -847,6 +893,8 @@ impl AppDelegate {
 
         // Update the file path and reload.
         set_file_path(path);
+        *self.ivars().remote_document.borrow_mut() = None;
+        self.ivars().picker_open.set(false);
         *self.ivars().debouncer.borrow_mut() = Some(debouncer);
 
         // Re-render.
@@ -855,6 +903,209 @@ impl AppDelegate {
                 let html_ns = NSString::from_str(&html);
                 unsafe { web_view.loadHTMLString_baseURL(&html_ns, None) };
             }
+        }
+    }
+
+    fn load_html(&self, html: &str) {
+        if let Some(web_view) = self.ivars().web_view.get() {
+            let html = NSString::from_str(html);
+            unsafe { web_view.loadHTMLString_baseURL(&html, None) };
+        }
+    }
+
+    fn show_remote_connections(&self, error: Option<&str>) {
+        self.ivars().picker_open.set(true);
+        self.load_html(&remote_picker::connections_page(error));
+        if let Some(window) = self.ivars().window.get() {
+            window.setTitle(ns_string!("Open Remote File"));
+        }
+    }
+
+    fn show_remote_directory(&self, connection: &remote::Connection, path: &str) {
+        match remote::list_directory(connection, path) {
+            Ok(listing) => {
+                let _ = remote::remember_directory(&connection.id, &listing.path);
+                self.load_html(&remote_picker::directory_page(connection, &listing));
+            }
+            Err(error) => {
+                let retry =
+                    remote_picker::action_url("browse", &[("id", &connection.id), ("path", path)]);
+                self.load_html(&remote_picker::error_page(&error, &retry));
+            }
+        }
+    }
+
+    fn handle_remote_action(&self, absolute_url: &str) {
+        let Ok(url) = url::Url::parse(absolute_url) else {
+            return;
+        };
+        let action = url.host_str().unwrap_or_default();
+        let parameters: HashMap<String, String> = url.query_pairs().into_owned().collect();
+
+        match action {
+            "connections" => self.show_remote_connections(None),
+            "cancel" => self.restore_document(),
+            "connect" => {
+                if let Some(connection) = parameters
+                    .get("id")
+                    .and_then(|id| remote::find_connection(id))
+                {
+                    let path = connection.last_directory.clone();
+                    self.show_remote_directory(&connection, &path);
+                }
+            }
+            "browse" => {
+                if let (Some(connection), Some(path)) = (
+                    parameters
+                        .get("id")
+                        .and_then(|id| remote::find_connection(id)),
+                    parameters.get("path"),
+                ) {
+                    self.show_remote_directory(&connection, path);
+                }
+            }
+            "open" => {
+                if let (Some(connection), Some(path)) = (
+                    parameters
+                        .get("id")
+                        .and_then(|id| remote::find_connection(id)),
+                    parameters.get("path"),
+                ) {
+                    self.open_remote_file(&connection, path);
+                }
+            }
+            "add" => self.add_remote_connection(&parameters),
+            "remove" => {
+                if let Some(id) = parameters.get("id") {
+                    if let Err(error) = remote::remove_connection(id) {
+                        self.show_remote_connections(Some(&error.to_string()));
+                    } else {
+                        self.show_remote_connections(None);
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn add_remote_connection(&self, parameters: &HashMap<String, String>) {
+        let port = parameters
+            .get("port")
+            .and_then(|port| port.parse::<u16>().ok())
+            .unwrap_or(22);
+        let connection = remote::Connection::new(
+            parameters.get("nickname").cloned().unwrap_or_default(),
+            parameters.get("host").cloned().unwrap_or_default(),
+            parameters.get("username").cloned(),
+            port,
+            parameters.get("identity_file").cloned(),
+        );
+        let mut connection = match connection {
+            Ok(connection) => connection,
+            Err(error) => {
+                self.show_remote_connections(Some(&error));
+                return;
+            }
+        };
+
+        match remote::list_directory(&connection, "~") {
+            Ok(listing) => {
+                connection.last_directory = listing.path.clone();
+                if let Err(error) = remote::save_connection(connection.clone()) {
+                    self.show_remote_connections(Some(&error.to_string()));
+                    return;
+                }
+                self.load_html(&remote_picker::directory_page(&connection, &listing));
+            }
+            Err(error) => {
+                remote::clear_rejected_credentials(&connection.id);
+                self.show_remote_connections(Some(&error));
+            }
+        }
+    }
+
+    fn open_remote_file(&self, connection: &remote::Connection, path: &str) {
+        match remote::download_file(connection, path) {
+            Ok(document) => {
+                set_file_path(document.cached_path.clone());
+                *self.ivars().remote_document.borrow_mut() = Some(document);
+                *self.ivars().debouncer.borrow_mut() = None;
+                self.ivars().picker_open.set(false);
+                if let Some(window) = self.ivars().window.get() {
+                    let file_name = PathBuf::from(path)
+                        .file_name()
+                        .and_then(|name| name.to_str())
+                        .unwrap_or("Remote file")
+                        .to_string();
+                    window.setTitle(&NSString::from_str(&format!(
+                        "{file_name} — {}",
+                        connection.nickname
+                    )));
+                }
+                if let Some(html) = load_and_render() {
+                    self.load_html(&html);
+                }
+            }
+            Err(error) => {
+                let retry =
+                    remote_picker::action_url("open", &[("id", &connection.id), ("path", path)]);
+                self.load_html(&remote_picker::error_page(&error, &retry));
+            }
+        }
+    }
+
+    fn restore_document(&self) {
+        self.ivars().picker_open.set(false);
+        if let Some(html) = load_and_render() {
+            self.load_html(&html);
+        }
+        if let Some(window) = self.ivars().window.get() {
+            if let Some(document) = self.ivars().remote_document.borrow().as_ref() {
+                let title = PathBuf::from(&document.remote_path)
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .unwrap_or("Remote file")
+                    .to_string();
+                window.setTitle(&NSString::from_str(&title));
+            } else {
+                let title = get_file_path()
+                    .as_deref()
+                    .and_then(|path| path.file_name())
+                    .and_then(|name| name.to_str())
+                    .unwrap_or("mdiew")
+                    .to_string();
+                window.setTitle(&NSString::from_str(&title));
+            }
+        }
+    }
+
+    fn reload_current_document(&self) {
+        if self.ivars().picker_open.get() {
+            return;
+        }
+        let remote_document = self.ivars().remote_document.borrow().clone();
+        if let Some(document) = remote_document {
+            match remote::refresh_document(&document) {
+                Ok(refreshed) => {
+                    *self.ivars().remote_document.borrow_mut() = Some(refreshed);
+                    if let Some(html) = load_and_render() {
+                        self.load_html(&html);
+                    }
+                }
+                Err(error) => {
+                    let retry = remote_picker::action_url(
+                        "open",
+                        &[
+                            ("id", &document.connection_id),
+                            ("path", &document.remote_path),
+                        ],
+                    );
+                    self.ivars().picker_open.set(true);
+                    self.load_html(&remote_picker::error_page(&error, &retry));
+                }
+            }
+        } else if let Some(html) = load_and_render() {
+            self.load_html(&html);
         }
     }
 }
@@ -904,9 +1155,22 @@ fn build_menu_bar(mtm: MainThreadMarker) {
     let file_menu = NSMenu::initWithTitle(NSMenu::alloc(mtm), ns_string!("File"));
     unsafe {
         file_menu.addItemWithTitle_action_keyEquivalent(
-            ns_string!("Open..."),
+            ns_string!("Open Local..."),
             Some(sel!(openDocument:)),
             ns_string!("o"),
+        );
+        file_menu.addItemWithTitle_action_keyEquivalent(
+            ns_string!("Open Remote..."),
+            Some(sel!(openRemoteDocument:)),
+            ns_string!(""),
+        );
+    }
+    file_menu.addItem(&NSMenuItem::separatorItem(mtm));
+    unsafe {
+        file_menu.addItemWithTitle_action_keyEquivalent(
+            ns_string!("Reload"),
+            Some(sel!(reloadDocument:)),
+            ns_string!("r"),
         );
     }
     file_menu.addItem(&NSMenuItem::separatorItem(mtm));

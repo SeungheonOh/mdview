@@ -25,6 +25,7 @@ objc2-foundation = { version = "0.3.2", default-features = false, features = [
     "NSString",
     "NSTimer",
     "NSURL",
+    "NSURLRequest",
     "NSThread",
 ] }
 objc2-web-kit = { version = "0.3.2", default-features = false, features = [
@@ -33,6 +34,8 @@ objc2-web-kit = { version = "0.3.2", default-features = false, features = [
     "objc2-app-kit",
     "objc2-core-foundation",
     "WKNavigation",
+    "WKNavigationAction",
+    "WKNavigationDelegate",
     "WKWebView",
 ] }
 syntect = "5.3.0"
