@@ -64,13 +64,14 @@ jobs:
           cat > Casks/mdiew.rb << EOF
           cask "mdiew" do
             arch arm: "aarch64", intel: "x86_64"
+
             version "${version}"
             sha256 arm:   "${sha_arm}",
                    intel: "${sha_intel}"
 
             url "https://github.com/SeungheonOh/mdiew/releases/download/v#{version}/mdiew-#{arch}-apple-darwin.app.zip"
             name "mdiew"
-            desc "A fast, native macOS markdown viewer"
+            desc "Fast native Markdown viewer"
             homepage "https://github.com/SeungheonOh/mdiew"
 
             livecheck do
@@ -78,7 +79,7 @@ jobs:
               strategy :github_latest
             end
 
-            depends_on macos: ">= :monterey"
+            depends_on macos: :monterey
 
             app "mdiew.app"
 
